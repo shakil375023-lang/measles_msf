@@ -3,7 +3,7 @@
     "path": "~/GitHub/measles_msf/index.qmd",
     "project_path": "index.qmd",
     "type": "quarto_markdown",
-    "hash": "0",
+    "hash": "4079075125",
     "contents": "",
     "dirty": false,
     "created": 1780892968969.0,
@@ -12,15 +12,15 @@
     "properties": {
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "7,8",
-        "scrollLine": "0"
+        "cursorPosition": "639,49",
+        "scrollLine": "629"
     },
     "folds": "",
-    "lastKnownWriteTime": 1780893021,
+    "lastKnownWriteTime": 1780894261,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1780893021534,
+    "last_content_update": 1780894261815,
     "read_only": false,
     "read_only_alternatives": []
 }

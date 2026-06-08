@@ -60,7 +60,7 @@ measles_data <- read.csv(here("data/measles_data.csv")) %>%
       str_to_sentence(),
 
     # --- date ---
-    date_of_visit = as.Date(date_of_visit, "%d/%m/%Y"),
+    date_of_visit = as.Date(date_of_visit, "%m/%d/%Y"),
 
     # --- IPD / OPD classification ---
     ipd_opd = if_else(patient_id == "n/a", "OPD", "IPD")
