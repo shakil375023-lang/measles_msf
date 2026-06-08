@@ -1,7 +1,0 @@
-"0","div("
-"0","  style = ""background-color:white; padding:0px; border-radius:0px; font-size:14px;"","
-"0","  div(span(strong(""Total Cases: ""), total_cases),"
-"0","  div(span(strong(""Weekly Cases: ""), weekly_cases),"
-"0","  div(span(strong(""Yesterday's Cases: ""), yesterdays_cases),"
-"0","      style = ""border-bottom:1px solid black; padding-bottom:2px;"")"
-"0",")))"
