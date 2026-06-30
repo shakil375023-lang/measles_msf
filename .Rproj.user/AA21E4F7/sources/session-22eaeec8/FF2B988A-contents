@@ -766,8 +766,6 @@ complication_text <- complication_prop %>%
   dplyr::pull(txt) %>%
   paste(collapse = "; ")
 
-complication_prop
-
 # -------------------------
 # Final proportions
 # -------------------------
@@ -2088,15 +2086,12 @@ complication_prop <- complications_ipd %>%
     values_to = "n"
   ) %>%
   dplyr::mutate(
+    `% of IPD` = round(n / N_IPD * 100, 2)
+  ) %>%
+  dplyr::mutate(
     complication = stringr::str_remove(complication, "^complications_"),
     complication = stringr::str_replace_all(complication, "_", " "),
-    complication = stringr::str_to_title(complication),
-
-    `% of IPD` = ifelse(
-      N_IPD > 0,
-      round(n / N_IPD * 100, 2),
-      NA
-    )
+    complication = stringr::str_to_title(complication)
   ) %>%
   dplyr::arrange(dplyr::desc(n))
 

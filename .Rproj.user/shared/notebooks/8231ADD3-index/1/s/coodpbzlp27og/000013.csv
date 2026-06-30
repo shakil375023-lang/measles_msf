@@ -1,0 +1,6 @@
+"0",""
+"0","# -------------------------"
+"0","# Final proportions"
+"0","# -------------------------"
+"0","OPD_pct <- ifelse(N_total > 0, round(N_OPD / N_total * 100, 2), NA)"
+"0","IPD_pct <- ifelse(N_total > 0, round(N_IPD / N_total * 100, 2), NA)"

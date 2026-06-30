@@ -135,6 +135,7 @@ epi_cases <- measles_data %>%
   ) %>%
   ungroup()
 ```
+
 ```{r}
 # =========================
 # CALCULATE NUMBERS
@@ -1975,19 +1976,12 @@ co_dx_final <- final_dx_long %>%
   dplyr::count(Diagnosis, name = "Numerator") %>%
   dplyr::mutate(
     `Denominator (IPD)` = N_IPD,
-
-    `% of IPD` = ifelse(
-      N_IPD > 0,
-      round(Numerator / N_IPD * 100, 2),
-      NA
-    ),
-
-    `% of All Cases` = ifelse(
-      N_all > 0,
-      round(Numerator / N_all * 100, 2),
-      NA
-    ),
-
+    `% of IPD` = round(Numerator / N_IPD * 100, 2),
+    `% of All Cases` = round(Numerator / N_all * 100, 2)
+  ) %>%
+ 
+  # STRING MANIPULATION MUST BE SEPARATE
+  dplyr::mutate(
     Diagnosis = stringr::str_remove(Diagnosis, "^final_diagnoses_"),
     Diagnosis = stringr::str_replace_all(Diagnosis, "_", " "),
     Diagnosis = paste0("+ ", stringr::str_to_title(Diagnosis))
@@ -2092,15 +2086,12 @@ complication_prop <- complications_ipd %>%
     values_to = "n"
   ) %>%
   dplyr::mutate(
+    `% of IPD` = round(n / N_IPD * 100, 2)
+  ) %>%
+  dplyr::mutate(
     complication = stringr::str_remove(complication, "^complications_"),
     complication = stringr::str_replace_all(complication, "_", " "),
-    complication = stringr::str_to_title(complication),
-
-    `% of IPD` = ifelse(
-      N_IPD > 0,
-      round(n / N_IPD * 100, 2),
-      NA
-    )
+    complication = stringr::str_to_title(complication)
   ) %>%
   dplyr::arrange(dplyr::desc(n))
 
