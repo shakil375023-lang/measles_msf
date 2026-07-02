@@ -1,6 +1,6 @@
 ---
 title: Measles Dashboard - OCB
-subtitle: Cox's Bazaar - April to June 2026
+subtitle: Cox's Bazaar - April to 1st of July 2026
 
 project:
   output-dir: docs
