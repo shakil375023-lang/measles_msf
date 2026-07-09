@@ -1,0 +1,512 @@
+# -------------------------
+# REFERRAL FROM (sources)
+# -------------------------
+referral_map <- c(
+ocp_goyalmara  = "OCP Goyalmara",
+ocp_hoh        = "OCP HoH",
+other_facility = "Other facility",
+brac           = "BRAC",
+iom            = "IOM",
+oca_ktp        = "OCA KTP",
+"n/a"          = "NJMS/HMS",
+"n_a"          = "NJMS/HMS"
+)
+referral_levels <- c(
+"OCP Goyalmara",
+"OCP HoH",
+"Other facility",
+"BRAC",
+"IOM",
+"OCA KTP",
+"NJMS/HMS"
+)
+referral_ipd <- measles_data %>%
+dplyr::filter(ipd_opd == "IPD") %>%
+dplyr::mutate(
+referral_from = tolower(trimws(referral_from)),
+Referral_Source = referral_map[referral_from]
+) %>%
+dplyr::filter(!is.na(Referral_Source)) %>%
+dplyr::count(Referral_Source, name = "N_IPD") %>%
+tidyr::complete(
+Referral_Source = referral_levels,
+fill = list(N_IPD = 0)
+) %>%
+dplyr::mutate(
+Denominator = sum(N_IPD),
+`% of IPD` = ifelse(
+Denominator > 0,
+round(N_IPD / Denominator * 100, 2),
+NA
+),
+Referral_Source = factor(Referral_Source, levels = referral_levels)
+) %>%
+dplyr::arrange(Referral_Source)
+# -------------------------
+# REFERRALS TO (outgoing)
+# -------------------------
+referral_to_ipd <- measles_data %>%
+dplyr::filter(ipd_opd == "IPD") %>%
+dplyr::mutate(
+referred_to = tolower(trimws(if_referred_where))
+) %>%
+dplyr::mutate(
+Referred_To = dplyr::case_when(
+referred_to == "oca_ktp"       ~ "OCA KTP",
+referred_to == "ocp_goyalmara" ~ "OCP Goyalmara",
+TRUE                           ~ NA_character_
+)
+) %>%
+dplyr::filter(!is.na(Referred_To)) %>%
+dplyr::count(Referred_To, name = "N") %>%
+dplyr::mutate(
+Denominator = N_IPD,
+`% of IPD` = ifelse(
+N_IPD > 0,
+round(N / N_IPD * 100, 2),
+NA
+)
+)
+# Total referred out
+total_referred_out <- referral_to_ipd %>%
+dplyr::summarise(
+Referred_To = "Total referred out (any facility)",
+N = sum(N),
+Denominator = N_IPD,
+`% of IPD` = ifelse(N_IPD > 0, round(N / N_IPD * 100, 2), NA)
+)
+referral_to_final <- dplyr::bind_rows(referral_to_ipd, total_referred_out)
+# -------------------------
+# COMBINE TABLE
+# -------------------------
+from_header <- tibble::tibble(
+Referral_Source = "REFERRALS FROM",
+N_IPD = NA_real_,
+Denominator = NA_real_,
+`% of IPD` = NA_real_
+)
+to_header <- tibble::tibble(
+Referral_Source = "REFERRALS TO",
+N_IPD = NA_real_,
+Denominator = NA_real_,
+`% of IPD` = NA_real_
+)
+referral_combined <- dplyr::bind_rows(
+from_header,
+referral_ipd %>% dplyr::select(Referral_Source, N_IPD, Denominator, `% of IPD`),
+to_header,
+referral_to_final %>%
+dplyr::transmute(
+Referral_Source = Referred_To,
+N_IPD = N,
+Denominator,
+`% of IPD`
+)
+)
+# -------------------------
+# GT TABLE
+# -------------------------
+referral_combined %>%
+gt::gt() %>%
+gt::tab_header(
+title = gt::md("**Referrals IPD**")
+) %>%
+gt::cols_label(
+Referral_Source = "Referral Source",
+N_IPD           = "N referred",
+Denominator     = "Total IPD",
+`% of IPD`      = "% referred"
+) %>%
+gt::cols_align("center", c(N_IPD, Denominator, `% of IPD`)) %>%
+gt::cols_align("left", Referral_Source) %>%
+# Formatting
+gt::fmt_number(columns = c(N_IPD, Denominator), decimals = 0) %>%
+gt::fmt_number(columns = `% of IPD`, decimals = 1) %>%
+gt::fmt_missing(everything(), missing_text = "") %>%
+# Styling
+gt::opt_table_font(
+font = list(gt::google_font("Roboto"), gt::default_fonts())
+) %>%
+gt::tab_style(
+style = list(
+gt::cell_fill(color = "#008CBA"),
+gt::cell_text(color = "white", weight = "bold")
+),
+locations = gt::cells_title(groups = "title")
+) %>%
+gt::tab_style(
+style = gt::cell_text(color = "#008CBA", weight = "bold"),
+locations = gt::cells_column_labels()
+) %>%
+gt::tab_style(
+style = gt::cell_text(color = "#008CBA", weight = "bold"),
+locations = gt::cells_body(
+rows = Referral_Source %in% c("REFERRALS FROM", "REFERRALS TO")
+)
+) %>%
+gt::cols_width(
+Referral_Source ~ gt::px(260),
+everything() ~ gt::px(120)
+)
+#| title: "Patient Origin"
+# -------------------------
+# STANDARDISE CAMP NAMES
+# -------------------------
+measles_camp <- measles_data %>%
+dplyr::mutate(
+Camp = dplyr::case_when(
+camp %in% c("14", "Camp 14") ~ "Camp 14",
+camp %in% c("15", "Camp 15") ~ "Camp 15",
+camp %in% c("16", "Camp 16") ~ "Camp 16",
+TRUE                         ~ "Other"
+)
+)
+# -------------------------
+# CASE COUNTS
+# -------------------------
+camp_cases <- measles_camp %>%
+dplyr::group_by(Camp) %>%
+dplyr::summarise(
+`ALL Cases` = dplyr::n(),
+IPD_N       = sum(ipd_opd == "IPD", na.rm = TRUE),
+Simple_N    = sum(clinical_severity == "simple", na.rm = TRUE),
+Severe_N    = sum(clinical_severity == "severe", na.rm = TRUE),
+.groups = "drop"
+)
+# -------------------------
+# POPULATION
+# -------------------------
+camp_population_clean <- camp_population %>%
+dplyr::mutate(
+Camp = dplyr::case_when(
+`Camp / Location` %in% c("Camp 14", "Camp 15", "Camp 16") ~ `Camp / Location`,
+TRUE                                                     ~ "Other"
+)
+) %>%
+dplyr::group_by(Camp) %>%
+dplyr::summarise(
+Population = sum(`Pop (At Risk)`, na.rm = TRUE),
+.groups = "drop"
+)
+# -------------------------
+# FINAL TABLE
+# -------------------------
+camp_table <- camp_cases %>%
+dplyr::left_join(camp_population_clean, by = "Camp") %>%
+dplyr::mutate(
+`% Total` = round(`ALL Cases` / sum(`ALL Cases`) * 100, 1),
+# ✅ SAFE attack rate (won’t crash if missing population)
+`Attack Rate /1k` = ifelse(
+!is.na(Population) & Population > 0,
+round((`ALL Cases` / Population) * 1000, 2),
+NA
+)
+) %>%
+dplyr::arrange(
+factor(Camp, levels = c("Camp 14", "Camp 15", "Camp 16", "Other"))
+) %>%
+dplyr::select(
+Camp,
+`ALL Cases`,
+`% Total`,
+IPD_N,
+Simple_N,
+Severe_N,
+`Attack Rate /1k`
+)
+# -------------------------
+# GT TABLE
+# -------------------------
+camp_table %>%
+gt::gt() %>%
+gt::tab_header(
+title = gt::md("**Patients Origin by Camp**")
+) %>%
+gt::cols_label(
+Camp              = "Camp / Location",
+`ALL Cases`       = "All Cases",
+`% Total`         = "% Total",
+IPD_N             = "IPD (N)",
+Simple_N          = "Simple (N)",
+Severe_N          = "Severe (N)",
+`Attack Rate /1k` = "Attack Rate /1k"
+) %>%
+gt::cols_align("left", Camp) %>%
+gt::cols_align(
+"right",
+c(`ALL Cases`, `% Total`, IPD_N, Simple_N, Severe_N, `Attack Rate /1k`)
+) %>%
+# Formatting
+gt::fmt_number(columns = c(`ALL Cases`, IPD_N, Simple_N, Severe_N), decimals = 0) %>%
+gt::fmt_number(columns = `% Total`, decimals = 1) %>%
+gt::fmt_number(columns = `Attack Rate /1k`, decimals = 2) %>%
+gt::fmt_missing(everything(), missing_text = "") %>%
+# Styling
+gt::opt_table_font(
+font = list(gt::google_font("Roboto"), gt::default_fonts())
+) %>%
+gt::opt_align_table_header(align = "left") %>%
+gt::tab_style(
+style = list(
+gt::cell_fill(color = "#008CBA"),
+gt::cell_text(color = "white", weight = "bold")
+),
+locations = gt::cells_title(groups = "title")
+) %>%
+gt::tab_style(
+style = gt::cell_text(color = "#008CBA", weight = "bold"),
+locations = gt::cells_column_labels()
+) %>%
+gt::tab_style(
+style = gt::cell_text(color = "black"),
+locations = gt::cells_body()
+) %>%
+gt::cols_width(
+Camp ~ gt::px(230),
+everything() ~ gt::px(120)
+)
+#| title: "Co-diagnoses"
+# --------------------------------------------------
+# DENOMINATORS
+# --------------------------------------------------
+N_IPD <- sum(measles_data$ipd_opd == "IPD", na.rm = TRUE)
+N_all <- nrow(measles_data)
+# --------------------------------------------------
+# LONG FORMAT (IPD ONLY)
+# --------------------------------------------------
+final_dx_long <- measles_data %>%
+dplyr::filter(ipd_opd == "IPD") %>%
+dplyr::select(
+dplyr::starts_with("final_diagnoses_"),
+-dplyr::any_of("final_diagnoses_measles")
+) %>%
+dplyr::mutate(
+dplyr::across(
+everything(),
+~ .x %in% c(TRUE, "TRUE", "true")
+)
+) %>%
+tidyr::pivot_longer(
+cols = everything(),
+names_to  = "Diagnosis",
+values_to = "Present"
+) %>%
+dplyr::filter(Present)
+# --------------------------------------------------
+# SUMMARY
+# --------------------------------------------------
+co_dx_final <- final_dx_long %>%
+dplyr::count(Diagnosis, name = "Numerator") %>%
+dplyr::mutate(
+`Denominator (IPD)` = N_IPD,
+`% of IPD` = round(Numerator / N_IPD * 100, 2),
+`% of All Cases` = round(Numerator / N_all * 100, 2)
+) %>%
+# STRING MANIPULATION MUST BE SEPARATE
+dplyr::mutate(
+Diagnosis = stringr::str_remove(Diagnosis, "^final_diagnoses_"),
+Diagnosis = stringr::str_replace_all(Diagnosis, "_", " "),
+Diagnosis = paste0("+ ", stringr::str_to_title(Diagnosis))
+) %>%
+dplyr::arrange(dplyr::desc(Numerator))
+# --------------------------------------------------
+# GT TABLE
+# --------------------------------------------------
+co_dx_final %>%
+gt::gt() %>%
+gt::tab_header(
+title = gt::md("**Co‑Diagnoses (IPD Patients)**")
+) %>%
+gt::cols_label(
+Diagnosis          = "Co‑Diagnosis",
+Numerator          = "N (IPD)",
+`Denominator (IPD)`= "Total IPD",
+`% of IPD`         = "% of IPD",
+`% of All Cases`   = "% of All Cases"
+) %>%
+gt::cols_align("left", Diagnosis) %>%
+gt::cols_align("center",
+c(Numerator, `Denominator (IPD)`, `% of IPD`, `% of All Cases`)
+) %>%
+# Formatting
+gt::fmt_number(columns = Numerator, decimals = 0) %>%
+gt::fmt_number(columns = `Denominator (IPD)`, decimals = 0) %>%
+gt::fmt_number(columns = c(`% of IPD`, `% of All Cases`), decimals = 1) %>%
+gt::fmt_missing(gt::everything(), missing_text = "") %>%
+# Styling
+gt::opt_table_font(
+font = list(gt::google_font("Roboto"), gt::default_fonts())
+) %>%
+gt::opt_align_table_header(align = "left") %>%
+gt::tab_style(
+style = list(
+gt::cell_fill(color = "#008CBA"),
+gt::cell_text(color = "white", weight = "bold")
+),
+locations = gt::cells_title(groups = "title")
+) %>%
+gt::tab_style(
+style = gt::cell_text(color = "#008CBA", weight = "bold"),
+locations = gt::cells_column_labels()
+) %>%
+gt::tab_style(
+style = gt::cell_text(color = "black"),
+locations = gt::cells_body()
+) %>%
+gt::cols_width(
+Diagnosis ~ gt::px(260),
+everything() ~ gt::px(130)
+)
+#| title: "Complications IPD"
+# -------------------------
+# PREP COMPLICATION MATRIX
+# -------------------------
+complications_ipd <- ipd %>%
+dplyr::select(
+dplyr::starts_with("complications_"),
+-dplyr::any_of("complications_none")
+) %>%
+dplyr::mutate(
+dplyr::across(
+everything(),
+~ .x %in% c(TRUE, "TRUE", "true")
+)
+)
+# -------------------------
+# ANY COMPLICATION
+# -------------------------
+any_complication_n <- sum(
+rowSums(complications_ipd, na.rm = TRUE) > 0
+)
+# -------------------------
+# INDIVIDUAL COMPLICATIONS
+# -------------------------
+complication_prop <- complications_ipd %>%
+dplyr::summarise(dplyr::across(everything(), ~ sum(.x, na.rm = TRUE))) %>%
+tidyr::pivot_longer(
+cols = everything(),
+names_to = "complication",
+values_to = "n"
+) %>%
+dplyr::mutate(
+`% of IPD` = round(n / N_IPD * 100, 2)
+) %>%
+dplyr::mutate(
+complication = stringr::str_remove(complication, "^complications_"),
+complication = stringr::str_replace_all(complication, "_", " "),
+complication = stringr::str_to_title(complication)
+) %>%
+dplyr::arrange(dplyr::desc(n))
+# -------------------------
+# FINAL TABLE DATA
+# -------------------------
+complications_section <- tibble::tibble(
+`Complication Type` = c("Any complication", complication_prop$complication),
+`N (IPD)` = c(any_complication_n, complication_prop$n),
+Denominator = c(N_IPD, rep(N_IPD, nrow(complication_prop))),
+`% of IPD` = c(
+ifelse(N_IPD > 0, round(any_complication_n / N_IPD * 100, 2), NA),
+complication_prop$`% of IPD`
+)
+)
+# -------------------------
+# GT TABLE
+# -------------------------
+complications_section %>%
+gt::gt() %>%
+gt::tab_header(
+title = gt::md("**Complications (IPD Patients)**")
+) %>%
+gt::cols_label(
+`Complication Type` = "Complication Type",
+`N (IPD)`           = "IPD (N)",
+Denominator         = "Total IPD",
+`% of IPD`          = "% of IPD"
+) %>%
+gt::cols_align("left", `Complication Type`) %>%
+gt::cols_align("center", c(`N (IPD)`, Denominator, `% of IPD`)) %>%
+# Formatting
+gt::fmt_number(columns = c(`N (IPD)`, Denominator), decimals = 0) %>%
+gt::fmt_number(columns = `% of IPD`, decimals = 1) %>%
+gt::fmt_missing(gt::everything(), missing_text = "") %>%
+# Styling
+gt::opt_table_font(
+font = list(gt::google_font("Roboto"), gt::default_fonts())
+) %>%
+gt::opt_align_table_header(align = "left") %>%
+gt::tab_style(
+style = list(
+gt::cell_fill(color = "#008CBA"),
+gt::cell_text(color = "white", weight = "bold")
+),
+locations = gt::cells_title(groups = "title")
+) %>%
+gt::tab_style(
+style = gt::cell_text(color = "#008CBA", weight = "bold"),
+locations = gt::cells_column_labels()
+) %>%
+gt::tab_style(
+style = gt::cell_text(color = "black"),
+locations = gt::cells_body()
+) %>%
+# Highlight "Any complication"
+gt::tab_style(
+style = list(
+gt::cell_text(weight = "bold"),
+gt::cell_fill(color = "#F8F9FA")
+),
+locations = gt::cells_body(
+rows = `Complication Type` == "Any complication"
+)
+) %>%
+gt::cols_width(
+`Complication Type` ~ gt::px(260),
+everything() ~ gt::px(130)
+)
+#| padding: 0px
+# -------------------------
+# EPI CURVE (TILE)
+# -------------------------
+epi_curve <- ggplot(
+epi_cases,
+aes(
+x = date_of_visit,
+y = case_id,
+fill = ipd_opd,
+text = hover_text
+)
+) +
+geom_tile(
+width = 0.9,
+height = 0.9,
+color = "black"
+) +
+scale_x_date(
+date_breaks = "1 day",
+date_labels = "%d %b",
+expand = c(0, 0)
+) +
+labs(
+title = "Epidemic curve – measles",
+subtitle = paste0(
+format(min(epi_cases$date_of_visit, na.rm = TRUE), "%d.%m"),
+" – ",
+format(max(epi_cases$date_of_visit, na.rm = TRUE), "%d.%m")
+),
+x = NULL,
+y = "Cases",
+fill = NULL
+) +
+theme_minimal() +
+theme(
+plot.title = element_text(face = "bold"),
+axis.text.x = element_text(angle = 45, hjust = 1),
+plot.margin = margin(5, 5, 5, 5),
+legend.position = "bottom",
+legend.box = "horizontal"
+)
+# -------------------------
+# INTERACTIVE
+# -------------------------
+ggplotly(epi_curve, tooltip = "text") %>%
+config(displayModeBar = FALSE)
